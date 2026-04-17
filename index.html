@@ -1,12 +1,739 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Day Trade Helper</title>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --accent-green: #3fb950;
+      --accent-red: #f85149;
+      --accent-blue: #58a6ff;
+      --border-color: #30363d;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .app { max-width: 1400px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { font-size: 2rem; margin-bottom: 8px; }
+    .header p { color: var(--text-secondary); }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+    .search-section, .chart-container, .ai-section, .panel {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .search-input-wrapper { display: flex; gap: 10px; margin-bottom: 20px; }
+    .search-input {
+      flex: 1; padding: 12px 16px; font-size: 16px;
+      background: var(--bg-tertiary); border: 1px solid var(--border-color);
+      border-radius: 8px; color: var(--text-primary);
+    }
+    .search-input:focus { outline: none; border-color: var(--accent-blue); }
+    .search-btn {
+      padding: 12px 24px; font-size: 16px; background: var(--accent-blue);
+      color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;
+    }
+    .search-btn:hover { opacity: 0.9; }
+    .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .chart-header h2 { font-size: 1.25rem; }
+    .stock-info { display: flex; gap: 20px; align-items: center; }
+    .stock-price { font-size: 1.5rem; font-weight: 700; }
+    .stock-change { padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+    .stock-change.positive { background: rgba(63,185,80,0.2); color: var(--accent-green); }
+    .stock-change.negative { background: rgba(248,81,73,0.2); color: var(--accent-red); }
+    #chart { width: 100%; height: 350px; position: relative; }
+    .chart-canvas { width: 100%; height: 100%; }
+    .ai-section h3 { font-size: 1.1rem; margin-bottom: 12px; color: var(--accent-blue); }
+    .pattern-badge {
+      display: inline-block; padding: 6px 12px; background: var(--bg-tertiary);
+      border-radius: 20px; font-size: 0.875rem; margin-bottom: 12px;
+    }
+    .ai-response { line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; }
+    .sidebar { display: flex; flex-direction: column; gap: 20px; }
+    .panel h3 { font-size: 1rem; margin-bottom: 16px; color: var(--text-secondary); }
+    .watchlist-item, .portfolio-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px; background: var(--bg-tertiary); border-radius: 8px;
+      margin-bottom: 8px; cursor: pointer;
+    }
+    .watchlist-item:hover, .portfolio-item:hover { background: var(--border-color); }
+    .watchlist-ticker { font-weight: 600; }
+    .watchlist-price { text-align: right; }
+    .pnl-positive { color: var(--accent-green); }
+    .pnl-negative { color: var(--accent-red); }
+    .add-section {
+      width: 100%; padding: 10px; background: var(--bg-tertiary);
+      border: 1px dashed var(--border-color); border-radius: 8px;
+      color: var(--text-secondary); cursor: pointer; margin-top: 8px;
+      text-align: center;
+    }
+    .add-section:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); display: flex; justify-content: center;
+      align-items: center; z-index: 1000;
+    }
+    .modal { background: var(--bg-secondary); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+    .modal h3 { margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 6px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px; background: var(--bg-tertiary);
+      border: 1px solid var(--border-color); border-radius: 6px;
+      color: var(--text-primary); font-size: 14px;
+    }
+    .form-group input:focus { outline: none; border-color: var(--accent-blue); }
+    .btn-primary { background: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    .btn-success { background: var(--accent-green); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    .btn-secondary { background: var(--bg-tertiary); color: var(--text-secondary); border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    .btn-danger { background: var(--accent-red); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .empty-state { text-align: center; padding: 30px; color: var(--text-secondary); }
+    .loading { display: flex; justify-content: center; padding: 40px; color: var(--text-secondary); }
+    .hidden { display: none; }
+    .total-box { margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; }
+    .total-row { display: flex; justify-content: space-between; }
+    .error-msg { color: var(--accent-red); padding: 10px; background: rgba(248,81,73,0.1); border-radius: 8px; margin-bottom: 12px; }
+    .price-display { font-size: 1.25rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>Day Trade Helper</h1>
+      <p>AI-powered candlestick analysis and portfolio tracking</p>
+    </div>
+
+    <div class="main-grid">
+      <div class="main-content">
+        <div class="search-section">
+          <div class="search-input-wrapper">
+            <input type="text" id="searchInput" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, TSLA, NVDA)">
+            <button id="searchBtn" class="search-btn">Search</button>
+          </div>
+          <div id="apiError" class="error-msg hidden"></div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <div>
+              <h2 id="symbolHeader">AAPL</h2>
+              <div id="dataSource" style="color: var(--text-secondary); font-size: 0.8rem;"></div>
+            </div>
+            <div class="stock-info" id="stockInfo"></div>
+          </div>
+          <div id="chart">
+            <canvas id="chartCanvas"></canvas>
+          </div>
+          <div id="chartLoading" class="loading hidden">Loading chart...</div>
+        </div>
+
+        <div class="ai-section">
+          <h3>Detected Pattern</h3>
+          <span id="patternBadge" class="pattern-badge">Search for a stock...</span>
+          <div id="aiResponse" class="ai-response"></div>
+          <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button id="aiBtn" class="btn-primary" style="display:none">Get AI Suggestion (Requires OpenAI Key)</button>
+            <button id="addPortfolioBtn" class="btn-success">Add to Portfolio</button>
+            <button id="addWatchlistBtn" class="btn-primary">Add to Watchlist</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <h3>Watchlist</h3>
+          <div id="watchlist"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Portfolio</h3>
+          <div id="portfolio"></div>
+          <div id="portfolioTotal" class="total-box hidden">
+            <div class="total-row"><span>Total Value:</span><span id="totalValue"></span></div>
+            <div class="total-row"><span>Total P&amp;L:</span><span id="totalPnL"></span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Settings</h3>
+          <button id="settingsBtn" class="add-section">Configure API Keys</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="keyModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Configure API Keys</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
+        Finnhub is required for stock data. OpenAI is optional for AI suggestions.
+      </p>
+      <div class="form-group">
+        <label>Finnhub API Key (required)</label>
+        <input type="text" id="finnhubKey" placeholder="Your Finnhub API key" style="font-family: monospace;">
+        <button type="button" id="testKeyBtn" class="btn-secondary" style="margin-top: 8px;">Test Key</button>
+        <div id="keyTestResult" style="margin-top: 8px; font-size: 0.85rem;"></div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">
+          Get free key at <a href="https://finnhub.io" target="_blank" style="color: var(--accent-blue);">finnhub.io</a>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>OpenAI API Key (optional)</label>
+        <input type="password" id="openaiKey" placeholder="sk-...">
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">
+          Get free key at <a href="https://platform.openai.com" target="_blank" style="color: var(--accent-blue);">platform.openai.com</a>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="saveKeysBtn" class="btn-primary">Save</button>
+        <button id="cancelKeysBtn" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="portfolioModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="portfolioModalTitle">Add to Portfolio</h3>
+      <div class="form-group">
+        <label>Number of Shares</label>
+        <input type="number" id="sharesInput" placeholder="10">
+      </div>
+      <div class="form-group">
+        <label>Entry Price</label>
+        <input type="number" step="0.01" id="entryPriceInput" placeholder="150.00">
+      </div>
+      <div class="modal-actions">
+        <button id="savePortfolioBtn" class="btn-primary">Add</button>
+        <button id="cancelPortfolioBtn" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var apiKeys = { finnhub: '', openai: '' };
+    var currentSymbol = 'AAPL';
+    var quote = null;
+    var candleData = [];
+    var dataSource = '';
+    var watchlist = [];
+    var portfolio = [];
+    var companyInfo = null;
+
+    function loadData() {
+      var keys = localStorage.getItem('daytrade_apiKeys');
+      if (keys) {
+        apiKeys = JSON.parse(keys);
+        if (!apiKeys.finnhub) {
+          document.getElementById('keyModal').classList.remove('hidden');
+        }
+      } else {
+        document.getElementById('keyModal').classList.remove('hidden');
+      }
+
+      var wl = localStorage.getItem('daytrade_watchlist');
+      if (wl) watchlist = JSON.parse(wl);
+
+      var pf = localStorage.getItem('daytrade_portfolio');
+      if (pf) portfolio = JSON.parse(pf);
+
+      renderWatchlist();
+      renderPortfolio();
+
+      if (apiKeys.finnhub) {
+        document.getElementById('searchInput').value = currentSymbol;
+        fetchStockData();
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('daytrade_apiKeys', JSON.stringify(apiKeys));
+      localStorage.setItem('daytrade_watchlist', JSON.stringify(watchlist));
+      localStorage.setItem('daytrade_portfolio', JSON.stringify(portfolio));
+    }
+
+    function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function showError(msg) {
+      var el = document.getElementById('apiError');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+    function hideError() {
+      document.getElementById('apiError').classList.add('hidden');
+    }
+
+    async function fetchStockData() {
+      if (!apiKeys.finnhub) {
+        showError('Finnhub API key required. Please configure in Settings.');
+        return;
+      }
+
+      hideError();
+      showModal('chartLoading');
+      document.getElementById('chartLoading').textContent = 'Connecting...';
+
+      try {
+        var startTime = Date.now();
+        var url = 'https://finnhub.io/api/v1/quote?symbol=' + currentSymbol + '&token=' + apiKeys.finnhub;
+        console.log('Fetching:', url);
+
+        var quoteRes = await fetch(url);
+        var elapsed = Date.now() - startTime;
+        console.log('Response time:', elapsed, 'ms, status:', quoteRes.status);
+
+        if (!quoteRes.ok) {
+          if (quoteRes.status === 403 || quoteRes.status === 401) {
+            console.log('Finnhub quote failed, trying Yahoo Finance');
+            var yahooQuoteUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + currentSymbol + '?interval=1m&range=1d';
+            var yahooQ = await fetch(yahooQuoteUrl);
+            var yahooQD = await yahooQ.json();
+            if (yahooQD.chart && yahooQD.chart.result && yahooQD.chart.result[0]) {
+              var meta = yahooQD.chart.result[0].meta;
+              quote = { c: meta.regularMarketPrice, d: meta.regularMarketPrice - meta.previousClose, dp: ((meta.regularMarketPrice - meta.previousClose) / meta.previousClose) * 100, h: meta.regularMarketDayHigh, l: meta.regularMarketDayLow, o: meta.chartPreviousClose, pc: meta.previousClose };
+            } else {
+              throw new Error('Both Finnhub and Yahoo failed. Check your internet connection.');
+            }
+          } else {
+            throw new Error('Finnhub error: ' + quoteRes.status);
+          }
+        } else {
+          var testJson = await quoteRes.json();
+          if (!testJson.c || testJson.c === 0) {
+            console.log('Finnhub returned no data, trying Yahoo Finance');
+            var yahooQuoteUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + currentSymbol + '?interval=1m&range=1d';
+            var yahooQ = await fetch('https://corsproxy.io/?' + encodeURIComponent(yahooQuoteUrl));
+            var yahooQD = await yahooQ.json();
+            if (yahooQD.chart && yahooQD.chart.result && yahooQD.chart.result[0]) {
+              var meta = yahooQD.chart.result[0].meta;
+              quote = { c: meta.regularMarketPrice, d: meta.regularMarketPrice - meta.previousClose, dp: ((meta.regularMarketPrice - meta.previousClose) / meta.previousClose) * 100, h: meta.regularMarketDayHigh, l: meta.regularMarketDayLow, o: meta.chartPreviousClose, pc: meta.previousClose };
+            } else {
+              throw new Error('Symbol "' + currentSymbol + '" not found. Try a valid US stock.');
+            }
+          } else {
+            quote = testJson;
+          }
+        }
+
+        console.log('Final quote data:', quote);
+
+        document.getElementById('chartLoading').textContent = 'Loading TradingView chart...';
+
+        drawCandlestickChart();
+        analyzePattern();
+
+        document.getElementById('symbolHeader').textContent = currentSymbol;
+      document.getElementById('dataSource').textContent = 'Demo chart - not real data';
+        var changeClass = quote.d >= 0 ? 'positive' : 'negative';
+        var changeSign = quote.d >= 0 ? '+' : '';
+        document.getElementById('stockInfo').innerHTML = '<span class="stock-price">$' + quote.c.toFixed(2) + '</span><span class="stock-change ' + changeClass + '">' + changeSign + quote.d.toFixed(2) + ' (' + quote.dp.toFixed(2) + '%)</span>';
+
+      } catch (err) {
+        console.error('Error:', err);
+        showError(err.message);
+        document.getElementById('chartLoading').textContent = err.message;
+        return;
+      }
+
+      hideModal('chartLoading');
+    }
+
+    var tvChart = null;
+    var tvCandleSeries = null;
+
+    function drawCandlestickChart() {
+      var container = document.getElementById('chart');
+      container.innerHTML = '';
+
+      var wrapper = document.createElement('div');
+      wrapper.id = 'tvChart';
+      wrapper.style.width = '100%';
+      wrapper.style.height = '350px';
+      container.appendChild(wrapper);
+
+      try {
+        if (typeof LightweightCharts === 'undefined') {
+          wrapper.innerHTML = '<div class="loading">Chart library not loaded. Refresh the page.</div>';
+          return;
+        }
+
+        if (tvChart) {
+          tvChart.remove();
+          tvChart = null;
+        }
+
+        tvChart = LightweightCharts.createChart(wrapper, {
+          width: wrapper.clientWidth,
+          height: 350,
+          layout: { background: { color: '#161b22' }, textColor: '#8b949e' },
+          grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+          crosshair: { mode: 1 },
+          timeScale: { borderColor: '#30363d' },
+          rightPriceScale: { borderColor: '#30363d' }
+        });
+
+        tvCandleSeries = tvChart.addCandlestickSeries({
+          upColor: '#3fb950',
+          downColor: '#f85149',
+          borderUpColor: '#3fb950',
+          borderDownColor: '#f85149',
+          wickUpColor: '#3fb950',
+          wickDownColor: '#f85149'
+        });
+
+        if (candleData && candleData.length > 0) {
+          tvCandleSeries.setData(candleData);
+        } else {
+          var demoData = generateSimulatedCandles(quote);
+          tvCandleSeries.setData(demoData);
+          document.getElementById('dataSource').textContent = '(demo chart)';
+        }
+
+        tvChart.timeScale().fitContent();
+        document.getElementById('dataSource').textContent = '';
+      } catch (err) {
+        console.error('Chart error:', err);
+        wrapper.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+      }
+    }
+
+    function generateSimulatedCandles(q) {
+      var candles = [];
+      var now = Math.floor(Date.now() / 1000);
+      var interval = 300;
+      var currentPrice = q.c;
+      var dayVolatility = q.h - q.l;
+      var candleVolatility = dayVolatility / 6;
+
+      var prices = [
+        q.pc,
+        q.pc + (q.d * 0.3),
+        q.pc + (q.d * 0.5),
+        q.pc + (q.d * 0.4),
+        q.pc + (q.d * 0.6),
+        q.pc + (q.d * 0.7),
+        q.pc + (q.d * 0.5),
+        q.pc + (q.d * 0.8),
+        q.pc + (q.d * 0.4),
+        q.pc + (q.d * 0.2),
+        currentPrice - (candleVolatility * 0.3),
+        currentPrice - (candleVolatility * 0.1),
+        currentPrice + (candleVolatility * 0.2),
+        currentPrice + (candleVolatility * 0.4),
+        currentPrice + (candleVolatility * 0.1),
+        currentPrice + (candleVolatility * 0.3),
+        currentPrice
+      ];
+
+      for (var i = prices.length - 1; i >= 0; i--) {
+        var time = now - i * interval;
+        var price = prices[i];
+        var volatility = candleVolatility;
+
+        candles.push({
+          time: time,
+          open: price - (volatility * 0.3),
+          high: price + (volatility * 0.5),
+          low: price - (volatility * 0.6),
+          close: price
+        });
+      }
+
+      return candles;
+    }
+
+    function analyzePattern() {
+      if (candleData.length < 5) {
+        document.getElementById('patternBadge').textContent = 'Insufficient data';
+        return;
+      }
+
+      var last = candleData[candleData.length - 1];
+      var prev = candleData[candleData.length - 2];
+      var lastBody = Math.abs(last.close - last.open);
+      var lastRange = last.high - last.low;
+
+      var pattern = '';
+      if (last.open > last.close && last.low < last.open && lastRange > lastBody * 2) {
+        if (last.close > prev.close && prev.open > prev.close) pattern = 'Bullish Engulfing - Potential reversal upward';
+        else pattern = 'Hammer - Potential bullish reversal';
+      } else if (last.close > last.open && last.high > last.open && lastRange > lastBody * 2) {
+        if (last.open < prev.open && prev.open > prev.close) pattern = 'Bearish Engulfing - Potential reversal downward';
+        else pattern = 'Shooting Star - Potential bearish reversal';
+      } else if (lastBody < lastRange * 0.1) {
+        pattern = 'Doji - Market indecision';
+      } else if (last.close > last.open && last.close > prev.close && prev.close > prev.open) {
+        pattern = 'Bullish momentum building';
+      } else if (last.close < last.open && last.close < prev.close && prev.close < prev.open) {
+        pattern = 'Bearish pressure continuing';
+      } else {
+        pattern = 'Sideways movement - Watch for confirmation';
+      }
+
+      document.getElementById('patternBadge').textContent = pattern;
+    }
+
+    async function fetchAIInterpretation() {
+      if (!apiKeys.openai) {
+        document.getElementById('aiResponse').textContent = 'OpenAI key not configured. Add it in Settings for AI suggestions.';
+        return;
+      }
+
+      var btn = document.getElementById('aiBtn');
+      btn.textContent = 'Analyzing...';
+      btn.disabled = true;
+
+      try {
+        var pattern = document.getElementById('patternBadge').textContent;
+        var prompt = 'Analyze ' + currentSymbol + ':\nCurrent Price: $' + quote.c + '\nChange: $' + quote.d + ' (' + quote.dp + '%)\nDay Range: $' + quote.l + ' - $' + quote.h + '\nPrevious Close: $' + quote.pc + '\n\nDetected Pattern: ' + pattern + '\n\nProvide:\n1. Pattern explanation\n2. Suggested action (BUY/HOLD/SELL) with confidence level\n3. Key risks to watch\n4. Price targets for next 5-15 minutes';
+
+        var response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKeys.openai
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'You are a day trading assistant. Analyze candlestick patterns and provide actionable suggestions. Be concise and practical. Always include a confidence level and risk note.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 300
+          })
+        });
+
+        if (response.status === 429) {
+          throw new Error('OpenAI rate limit exceeded. Wait a moment and try again.');
+        }
+        if (response.status === 401) {
+          throw new Error('Invalid OpenAI key. Check Settings.');
+        }
+
+        var data = await response.json();
+        if (data.choices && data.choices[0]) {
+          document.getElementById('aiResponse').textContent = data.choices[0].message.content;
+        } else if (data.error) {
+          throw new Error(data.error.message);
+        }
+      } catch (err) {
+        document.getElementById('aiResponse').textContent = err.message;
+      }
+
+      btn.textContent = 'Get AI Suggestion';
+      btn.disabled = false;
+    }
+
+    function renderWatchlist() {
+      var el = document.getElementById('watchlist');
+      if (watchlist.length === 0) {
+        el.innerHTML = '<div class="empty-state">No stocks in watchlist</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < watchlist.length; i++) {
+        var item = watchlist[i];
+        var changeClass = item.change >= 0 ? 'pnl-positive' : 'pnl-negative';
+        var changeSign = item.change >= 0 ? '+' : '';
+        html += '<div class="watchlist-item" onclick="selectStock(\'' + item.symbol + '\')" ondblclick="removeFromWatchlist(\'' + item.symbol + '\')">';
+        html += '<div><div class="watchlist-ticker">' + item.symbol + '</div></div>';
+        html += '<div class="watchlist-price"><div class="price-display">$' + item.price.toFixed(2) + '</div>';
+        html += '<div class="' + changeClass + '">' + changeSign + item.changePercent.toFixed(2) + '%</div></div></div>';
+      }
+      el.innerHTML = html;
+    }
+
+    function renderPortfolio() {
+      var el = document.getElementById('portfolio');
+      var totalEl = document.getElementById('portfolioTotal');
+
+      if (portfolio.length === 0) {
+        el.innerHTML = '<div class="empty-state">No holdings yet</div>';
+        totalEl.classList.add('hidden');
+        return;
+      }
+
+      var totalValue = 0;
+      var totalPnL = 0;
+      var html = '';
+
+      for (var i = 0; i < portfolio.length; i++) {
+        var item = portfolio[i];
+        var currentPrice = item.symbol === currentSymbol && quote ? quote.c : item.currentPrice;
+        var value = item.shares * currentPrice;
+        var pnl = item.shares * (currentPrice - item.entryPrice);
+        totalValue += value;
+        totalPnL += pnl;
+
+        var pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+        var pnlSign = pnl >= 0 ? '+' : '';
+
+        html += '<div class="portfolio-item">';
+        html += '<div><div class="watchlist-ticker">' + item.symbol + '</div>';
+        html += '<div style="font-size: 0.8rem; color: #8b949e;">' + item.shares + ' shares @ $' + item.entryPrice + '</div></div>';
+        html += '<div class="watchlist-price"><div class="price-display">$' + value.toFixed(2) + '</div>';
+        html += '<div class="' + pnlClass + '">' + pnlSign + '$' + pnl.toFixed(2) + '</div></div></div>';
+      }
+
+      html += '<button onclick="removeFromPortfolio()" class="btn-danger" style="margin-top:8px;width:100%">Remove Last</button>';
+      el.innerHTML = html;
+
+      document.getElementById('totalValue').textContent = '$' + totalValue.toFixed(2);
+      var pnlEl = document.getElementById('totalPnL');
+      pnlEl.textContent = (totalPnL >= 0 ? '+' : '') + '$' + totalPnL.toFixed(2);
+      pnlEl.className = totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative';
+      totalEl.classList.remove('hidden');
+    }
+
+    function selectStock(symbol) {
+      currentSymbol = symbol;
+      document.getElementById('searchInput').value = symbol;
+      document.getElementById('aiResponse').textContent = '';
+      fetchStockData();
+    }
+
+    function removeFromWatchlist(symbol) {
+      var newList = [];
+      for (var i = 0; i < watchlist.length; i++) {
+        if (watchlist[i].symbol !== symbol) newList.push(watchlist[i]);
+      }
+      watchlist = newList;
+      saveData();
+      renderWatchlist();
+    }
+
+    function removeFromPortfolio() {
+      if (portfolio.length > 0) {
+        portfolio.pop();
+        saveData();
+        renderPortfolio();
+      }
+    }
+
+    function addToWatchlist() {
+      if (quote) {
+        watchlist.push({
+          symbol: currentSymbol,
+          price: quote.c,
+          change: quote.d,
+          changePercent: quote.dp
+        });
+        saveData();
+        renderWatchlist();
+      }
+    }
+
+    function addToPortfolio() {
+      var shares = parseFloat(document.getElementById('sharesInput').value);
+      var entryPrice = parseFloat(document.getElementById('entryPriceInput').value);
+
+      if (shares && entryPrice) {
+        portfolio.push({
+          symbol: currentSymbol,
+          shares: shares,
+          entryPrice: entryPrice,
+          currentPrice: quote ? quote.c : entryPrice,
+          date: new Date().toISOString().split('T')[0]
+        });
+        saveData();
+        renderPortfolio();
+        hideModal('portfolioModal');
+        document.getElementById('sharesInput').value = '';
+        document.getElementById('entryPriceInput').value = '';
+      }
+    }
+
+    document.getElementById('searchBtn').onclick = function() {
+      var sym = document.getElementById('searchInput').value.trim().toUpperCase();
+      if (sym) { currentSymbol = sym; document.getElementById('aiResponse').textContent = ''; fetchStockData(); }
+    };
+    document.getElementById('searchInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('searchBtn').click(); };
+
+    document.getElementById('saveKeysBtn').onclick = function() {
+      var finnhubKey = document.getElementById('finnhubKey').value.trim();
+      var openaiKey = document.getElementById('openaiKey').value.trim();
+      if (finnhubKey) {
+        apiKeys.finnhub = finnhubKey;
+        apiKeys.openai = openaiKey;
+        saveData();
+        hideModal('keyModal');
+        document.getElementById('searchInput').value = currentSymbol;
+        fetchStockData();
+      }
+    };
+
+    document.getElementById('testKeyBtn').onclick = async function() {
+      var keyToTest = document.getElementById('finnhubKey').value.trim();
+      var resultEl = document.getElementById('keyTestResult');
+      if (!keyToTest) {
+        resultEl.textContent = 'Please enter an API key first';
+        resultEl.style.color = 'var(--accent-red)';
+        return;
+      }
+      resultEl.textContent = 'Testing...';
+      resultEl.style.color = 'var(--text-secondary)';
+      try {
+        var res = await fetch('https://finnhub.io/api/v1/quote?symbol=AAPL&token=' + keyToTest);
+        var data = await res.json();
+        if (res.ok && data.c) {
+          resultEl.textContent = 'SUCCESS! Key works. AAPL price: $' + data.c;
+          resultEl.style.color = 'var(--accent-green)';
+        } else {
+          resultEl.textContent = 'FAILED: ' + (data.error || 'Invalid key');
+          resultEl.style.color = 'var(--accent-red)';
+        }
+      } catch (err) {
+        resultEl.textContent = 'ERROR: ' + err.message;
+        resultEl.style.color = 'var(--accent-red)';
+      }
+    };
+    document.getElementById('cancelKeysBtn').onclick = function() {
+      if (!apiKeys.finnhub) {
+        document.getElementById('keyModal').classList.remove('hidden');
+      } else {
+        hideModal('keyModal');
+      }
+    };
+
+    document.getElementById('settingsBtn').onclick = function() {
+      document.getElementById('finnhubKey').value = apiKeys.finnhub || '';
+      document.getElementById('openaiKey').value = apiKeys.openai || '';
+      showModal('keyModal');
+    };
+
+    document.getElementById('aiBtn').style.display = 'inline-block';
+    document.getElementById('aiBtn').onclick = fetchAIInterpretation;
+    document.getElementById('addWatchlistBtn').onclick = addToWatchlist;
+    document.getElementById('addPortfolioBtn').onclick = function() {
+      document.getElementById('sharesInput').value = '';
+      document.getElementById('entryPriceInput').value = quote ? quote.c.toFixed(2) : '';
+      document.getElementById('portfolioModalTitle').textContent = 'Add ' + currentSymbol + ' to Portfolio';
+      showModal('portfolioModal');
+    };
+    document.getElementById('savePortfolioBtn').onclick = addToPortfolio;
+    document.getElementById('cancelPortfolioBtn').onclick = function() { hideModal('portfolioModal'); };
+
+    window.onload = loadData;
+  </script>
+</body>
 </html>
