@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_KEY = 'demo'
+const API_KEY = 'RU45LENZAQ3IOOML'
 
 export const searchSymbol = async (query) => {
   try {
