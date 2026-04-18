@@ -3,12 +3,13 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCAUmjBBdMC_Bjo1rEx9lzxJY0mV9PK_E4",
+  authDomain: "day-trade-658a3.firebaseapp.com",
+  projectId: "day-trade-658a3",
+  storageBucket: "day-trade-658a3.firebasestorage.app",
+  messagingSenderId: "846321681523",
+  appId: "1:846321681523:web:bae20a18351ce3c55ad606",
+  measurementId: "G-45SQYT7SBL"
 }
 
 const app = initializeApp(firebaseConfig)
