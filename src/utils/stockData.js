@@ -1,10 +1,11 @@
 import axios from 'axios'
 
+const PROXY_URL = 'https://corsproxy.io/?'
 const BASE_URL = 'https://query1.finance.yahoo.com/v10'
 
 export const searchSymbol = async (query) => {
   try {
-    const response = await axios.get(`${BASE_URL}/finance/quoteSummary/${query}?modules=longName,shortName,symbol,marketCap`)
+    const response = await axios.get(`${PROXY_URL}${encodeURIComponent(`${BASE_URL}/finance/quoteSummary/${query}?modules=longName,shortName,symbol,marketCap`)}`)
     const data = response.data.quoteSummary.result[0]
     if (!data) return null
     
@@ -20,7 +21,7 @@ export const searchSymbol = async (query) => {
 
 export const getQuote = async (symbol) => {
   try {
-    const response = await axios.get(`${BASE_URL}/finance/quote?symbols=${symbol}`)
+    const response = await axios.get(`${PROXY_URL}${encodeURIComponent(`${BASE_URL}/finance/quote?symbols=${symbol}`)}`)
     const data = response.data.quoteResponse.result[0]
     if (!data) return null
     
@@ -46,20 +47,8 @@ export const getQuote = async (symbol) => {
 
 export const getHistoricalData = async (symbol, period = '1y', interval = '1d') => {
   try {
-    const periodMap = {
-      '5d': '5d',
-      '1mo': '1mo',
-      '3mo': '3mo',
-      '6mo': '6mo',
-      '1y': '1y',
-      '2y': '2y',
-      '5y': '5y',
-      'max': 'max'
-    }
-    
-    const response = await axios.get(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=0&period2=${Math.floor(Date.now() / 1000)}&interval=${interval}`
-    )
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=0&period2=${Math.floor(Date.now() / 1000)}&interval=${interval}`
+    const response = await axios.get(`${PROXY_URL}${encodeURIComponent(url)}`)
     
     const data = response.data.chart.result[0]
     if (!data || !data.timestamp) return []
@@ -88,10 +77,8 @@ export const getIntradayData = async (symbol, interval = '5m') => {
   try {
     const now = Math.floor(Date.now() / 1000)
     const oneDayAgo = now - 86400
-    
-    const response = await axios.get(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${oneDayAgo}&period2=${now}&interval=${interval}`
-    )
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${oneDayAgo}&period2=${now}&interval=${interval}`
+    const response = await axios.get(`${PROXY_URL}${encodeURIComponent(url)}`)
     
     const data = response.data.chart.result[0]
     if (!data || !data.timestamp) return []
